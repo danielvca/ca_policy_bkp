@@ -1,0 +1,38 @@
+# You can edit the cron below to change the recurrency.
+schedules:
+- cron: "0 0 * * FRI"
+  displayName: Weekly Backup
+  branches:
+    include:
+    - main
+
+stages :
+  - stage: BackUpPolicies
+    variables:
+      - group: 'CA Policies'
+    jobs:
+    - deployment: bkp_policies
+      pool: 
+        vmImage: 'ubuntu-latest'
+      continueOnError: false
+      environment: 'AZ Policies'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+              - task: PowerShell@2
+                displayName: 'Back-up AZ CA Policies'
+                inputs:
+                  filePath: '$(System.DefaultWorkingDirectory)/export_ca_.ps1'
+                  arguments: -clientId $clientid -tenantId $tenantid -clientSecret $ClientSecret
+                  pwsh: true
+              - task: AzurePowerShell@5
+                inputs:
+                  azureSubscription: '' #Enter your service connection name here
+                  azurePowerShellVersion: LatestVersion
+                  pwsh: true
+                  ScriptType: 'InlineScript'
+                  Inline: | #Add your storage account name below
+                    $StorageContext = New-AzStorageContext -StorageAccountName <str account name> -StorageAccountKey $(strkey) 
+                    Get-ChildItem -File -Recurse -Filter "*.json" | Set-AzStorageBlobContent -Container "ca-policies" -Context $StorageContext -Force
